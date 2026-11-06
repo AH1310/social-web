@@ -1,0 +1,27 @@
+name: Supabase health check
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * *'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public health row
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo 'Health check skipped: configure repository secrets first.'
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 30 --retry 2 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/health_check?select=id&limit=1" \
+            --output /tmp/social-web-health.json
+          python3 -c 'import json; assert json.load(open("/tmp/social-web-health.json")) == [{"id":1}], "Unexpected health response"'
+          echo 'Database API answered successfully. This does not guarantee prevention of Free-plan pausing.'
